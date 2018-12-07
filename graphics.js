@@ -6,6 +6,8 @@ class BlockGameCanvas {
   }
   
   place(width, height, x, y) {
+    this.width = width;
+    this.height = height;
     this.container.x = x;
     this.container.y = y;
     let graphics = new PIXI.Graphics();

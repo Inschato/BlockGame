@@ -17,6 +17,14 @@ class Piece {
     return this.all_rotations[this.rotation_index];
   }
   
+  height() {
+    return this.currentRotation().map(b=>b[1]).filter((v, i, self) => self.indexOf(v) === i).length;
+  }
+  
+  width() {
+    return this.currentRotation().map(b=>b[0]).filter((v, i, self) => self.indexOf(v) === i).length;
+  }
+  
   dropByOne() {
     return this.moved = this.move(0, 1, 0);
   }
@@ -73,6 +81,7 @@ class Board {
       this.grid.push(row);
     }
     this.currentBlock = Piece.nextPiece(this);
+    this.previewPiece = Piece.nextPiece(this);
     this.score = 0;
     this.lines = 0;
     this.pieces = 0;
@@ -147,8 +156,10 @@ class Board {
    
   }
   
-  nextPiece() {
-    this.currentBlock = Piece.nextPiece(this);
+  nextPiece() {    
+    this.currentBlock = this.previewPiece;
+    this.previewPiece = Piece.nextPiece(this);
+    this.drawOnce();
     this.currentPos = undefined;
     this.pieces++;
   }
@@ -208,6 +219,10 @@ class Board {
   draw() {
     this.currentPos = this.game.drawPiece(this.currentBlock, this.currentPos);
   }
+  
+  drawOnce() {
+    this.previewBlocks = this.game.drawPreviewPiece(this.previewPiece, this.previewBlocks)
+  }
 }
 
 Board.blockSize = 28;
@@ -228,9 +243,14 @@ class BlockGame {
   
   setBoard() {
     this.canvas = new BlockGameCanvas(this.root.stage);
+    this.preview_canvas = new BlockGameCanvas(this.root.stage);
     this.board = new Board(this);
     this.canvas.place(Board.blockSize * Board.numRows + 3, 
                       Board.blockSize * Board.numColumns + 6, 24, 80);      
+                      
+    this.preview_canvas.place(Board.blockSize * 4 + 3, 
+    Board.blockSize * 4 + 3, 335, 200);
+    this.board.drawOnce();
   }
   
   initHud() {
@@ -242,6 +262,11 @@ class BlockGame {
     this.score.x = 426;
     this.score.y = 145;
     this.root.stage.addChild(this.score);
+    
+    label = new PIXI.Text('Next Piece', {fontSize: 16});
+    label.x = 355;
+    label.y = 180;
+    this.root.stage.addChild(label);
         
     this.button_new_game = new BlockGameButton(this.root.stage, 24, 20, "images/new_game_button.png", () => this.newGame());
     this.button_pause = new BlockGameButton(this.root.stage, 187, 20, "images/pause_button.png", () => this.pause());
@@ -317,6 +342,31 @@ class BlockGame {
       new BlockGameRect(this.canvas, start[0]*size + block[0]*size + 3, 
                        start[1]*size + block[1]*size, size, size,
                        piece.color));
+  }
+  
+  drawPreviewPiece(piece, old=undefined) {
+    let size = Board.blockSize;
+    let center_piece = (piece) => {
+      let height = piece.height() * size;
+      let width = piece.width() * size;
+      return [this.preview_canvas.width / 2 - width / 2,
+              this.preview_canvas.height / 2 - height / 2];
+    }
+    
+    function normalize(currentRotation) {
+      let minWidth = currentRotation.reduce((acc, b) => b < acc ? b : acc)[0];
+      let minHeight = currentRotation.reduce((acc, b) => b[1] < acc ? b[1] : acc, currentRotation[0][1]);      
+      return currentRotation.map(block=> [block[0] - minWidth, block[1] - minHeight]);
+    }
+    
+    if (old) {
+      old.forEach(block=>block.remove());
+    }
+    
+    let blocks = normalize(piece.currentRotation());   
+    let start = center_piece(piece);    
+    return blocks.map(block => 
+      new BlockGameRect(this.preview_canvas, start[0] +block[0]*size, start[1] + block[1]*size, size, size, piece.color));
   }
 }
 
