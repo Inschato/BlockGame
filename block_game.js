@@ -38,6 +38,18 @@ class Piece {
         moved = false;
     });
     
+    // Try moving the piece back into the board if we're trying to rotate it on the edge
+    if (!moved && delta_rotation) {
+      moved = true;
+      let max_x = potential.reduce((acc, b) => b[0] > acc ? b[0] : acc, potential[0][0]) + this.position[0];
+      let min_x = potential.reduce((acc, b) => b[0] < acc ? b[0] : acc, potential[0][0]) + this.position[0];
+      delta_x = min_x < 0 ? -min_x : (Board.numColumns - 1) - max_x;
+      potential.forEach((posns) => {
+      if (!this.board.emptyAt([posns[0] + delta_x + this.position[0], posns[1] + delta_y + this.position[1]]))
+        moved = false;
+      });
+    }
+
     if (moved) {
       this.position[0] += delta_x;
       this.position[1] += delta_y;
