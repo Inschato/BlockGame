@@ -114,7 +114,8 @@ class Board {
       }
       this.grid.push(row);
     }
-    this.level = new Level(this, Levels.shift());
+    this.levels = Levels.slice();
+    this.level = new Level(this, this.levels.shift());
     this.currentBlock = this.level.nextPiece();
     this.previewPiece = this.level.nextPiece();
     this.score = 0;
@@ -265,7 +266,7 @@ class Board {
 
   updateLevel() {
     if (Levels.length > 0 && this.lines >= this.level.nextLevel) {
-      this.level = new Level(this, Levels.shift());
+      this.level = new Level(this, this.levels.shift());
       this.game.level.text = this.level.number;
     }
   }
@@ -412,6 +413,7 @@ class BlockGame {
   updateScore() {
     this.score.text = this.board.score;
     this.lines.text = this.board.lines;
+    this.level.text = this.board.level.number;
   }
 
   drawPiece(piece, old=undefined) {
