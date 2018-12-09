@@ -4,40 +4,41 @@ function getRndInteger(min, max) {
 }
 
 class Piece {
-  constructor(point_array, color, board) {    
+  constructor(board, point_array, texture, tint=null) {
     this.all_rotations = point_array;
     this.rotation_index = getRndInteger(0, this.all_rotations.length);
-    this.color = color;
+    this.texture = texture;
+    this.tint = tint;
     this.position = [5, 0];
     this.board = board;
     this.moved = true;
   }
-  
+
   currentRotation() {
     return this.all_rotations[this.rotation_index];
   }
-  
+
   height() {
     return this.currentRotation().map(b=>b[1]).filter((v, i, self) => self.indexOf(v) === i).length;
   }
-  
+
   width() {
     return this.currentRotation().map(b=>b[0]).filter((v, i, self) => self.indexOf(v) === i).length;
   }
-  
+
   dropByOne() {
     return this.moved = this.move(0, 1, 0);
   }
-  
+
   move(delta_x, delta_y, delta_rotation) {
     let moved = true;
     let potential = this.all_rotations[(this.rotation_index + delta_rotation) % this.all_rotations.length]
-    
-    potential.forEach((posns) => {      
+
+    potential.forEach((posns) => {
       if (!this.board.emptyAt([posns[0] + delta_x + this.position[0], posns[1] + delta_y + this.position[1]]))
         moved = false;
     });
-    
+
     // Try moving the piece back into the board if we're trying to rotate it on the edge
     if (!moved && delta_rotation) {
       moved = true;
@@ -54,20 +55,15 @@ class Piece {
       this.position[0] += delta_x;
       this.position[1] += delta_y;
       this.rotation_index = (this.rotation_index + delta_rotation) % this.all_rotations.length;
-    }    
+    }
     return moved;
   }
-  
+
   static rotations(point_array) {
     let rotate1 = point_array.map(p => [-p[1], p[0]]);
     let rotate2 = point_array.map(p => [-p[0], -p[1]]);
     let rotate3 = point_array.map(p => [p[1], -p[0]]);
     return [point_array, rotate1, rotate2, rotate3];
-  }
-  
-  static nextPiece(board) {
-    let i = getRndInteger(0, Piece.All_Pieces.length)
-    return new Piece(Piece.All_Pieces[i], Piece.All_Colors[i], board);
   }
 }
 
@@ -79,11 +75,37 @@ Piece.All_Pieces = [[[[0, 0], [1, 0], [0, 1], [1, 1]]],  // square (only needs o
                Piece.rotations([[0, 0], [0, -1], [0, 1], [-1, 1]]), // inverted L
                Piece.rotations([[0, 0], [-1, 0], [0, -1], [1, -1]]), // S
                Piece.rotations([[0, 0], [1, 0], [0, -1], [-1, -1]])]; // Z
-               
+
 Piece.All_Colors = [0x00FFFF, 0xD3D3D3, 0xFF0000, 0xFFFF00, 0xFF1493, 0x0000FF, 0x00FF00];
+
+class Level {
+  constructor(board, data) {
+    this.board = board;
+    this.pieces = data.pieces;
+    this.setBackground(data.background, data.tint);
+    this.board.delay = data.delay;
+    this.events = data.events;
+    this.number = data.number;
+    this.nextLevel = data.nextLevel;
+  }
+
+  setBackground(background, tint) {
+    this.board.game.background.texture = background;
+    if (tint) {
+      this.board.game.background.tint = tint;
+    }
+  }
+
+  nextPiece() {
+    let i = getRndInteger(0, this.pieces.length);
+    let piece = this.pieces[i];
+    return new Piece(this.board, piece.points, piece.texture, piece.tint);
+  }
+}
 
 class Board {
   constructor(game) {
+    this.game = game;
     this.grid = [];
     for(let i = 0; i < Board.numRows; i++) {
       let row = [];
@@ -92,19 +114,18 @@ class Board {
       }
       this.grid.push(row);
     }
-    this.currentBlock = Piece.nextPiece(this);
-    this.previewPiece = Piece.nextPiece(this);
+    this.level = new Level(this, Levels.shift());
+    this.currentBlock = this.level.nextPiece();
+    this.previewPiece = this.level.nextPiece();
     this.score = 0;
     this.lines = 0;
     this.pieces = 0;
-    this.game = game;
-    this.delay = 500;
   }
-  
+
   gameOver() {
     return this.grid[1].find(b=>b);
   }
-  
+
   run() {
     let ran = this.currentBlock.dropByOne();
     if (!ran) {
@@ -116,35 +137,35 @@ class Board {
     this.game.updateScore();
     this.draw();
   }
-  
+
   moveLeft() {
     if (!this.gameOver() && this.game.running) {
       this.currentBlock.move(-1, 0, 0);
     }
     this.draw();
   }
-  
+
   moveRight() {
     if (!this.gameOver() && this.game.running) {
       this.currentBlock.move(1, 0, 0);
     }
     this.draw();
   }
-  
+
   rotateClockwise() {
     if (!this.gameOver() && this.game.running) {
       this.currentBlock.move(0, 0, 1);
     }
     this.draw();
   }
-  
+
   rotateCounterClockwise() {
     if (!this.gameOver() && this.game.running) {
       this.currentBlock.move(0, 0, -1);
     }
     this.draw();
   }
-  
+
   dropAllTheWay() {
     if (this.game.running) {
       let ran = this.currentBlock.dropByOne();
@@ -162,47 +183,47 @@ class Board {
       this.draw();
     }
   }
-  
+
   // TODO: Fix this function to work properly
   dropOne() {
-   
+
   }
-  
-  nextPiece() {    
+
+  nextPiece() {
     this.currentBlock = this.previewPiece;
-    this.previewPiece = Piece.nextPiece(this);
+    this.previewPiece = this.level.nextPiece();
     this.drawOnce();
     this.currentPos = undefined;
     this.pieces++;
   }
-  
-  storeCurrent() {    
-    let locations = this.currentBlock.currentRotation();    
-    let displacement = this.currentBlock.position;    
+
+  storeCurrent() {
+    let locations = this.currentBlock.currentRotation();
+    let displacement = this.currentBlock.position;
     for (let i in locations) {
       let current = locations[i];
       this.grid[current[1] + displacement[1]][current[0] + displacement[0]] =
         this.currentPos[i];
-    }    
+    }
     this.removeFilled();
-    this.delay = this.delay - 2 < 80 ? 80 : this.delay - 2;
   }
-  
+
   emptyAt(point) {
     if (!(point[0] >= 0 && point[0] < Board.numColumns)) {
       return false;
     } else if (point[1] < 1) {
-      return true;     
+      return true;
     } else if (point[1] >= Board.numRows) {
       return false;
-    }    
+    }
     return (this.grid[point[1]][point[0]] == undefined);
   }
-  
+
   removeFilled() {
-    for(let i = 2; i < this.grid.length; i++) {      
+    let linesCleared = 0;
+    for(let i = 2; i < this.grid.length; i++) {
       // see if row is filled
-      if (this.grid[i].findIndex(e=>e==undefined) == -1) {        
+      if (this.grid[i].findIndex(e=>e==undefined) == -1) {
         // remove filled row
         for (let j in this.grid[i]) {
           this.grid[i][j].remove();
@@ -213,7 +234,7 @@ class Board {
           for (let k in this.grid[j]) {
             if (this.grid[this.grid.length - j][k])
               this.grid[this.grid.length - j][k].move(0, Board.blockSize);
-          }          
+          }
           this.grid[this.grid.length - j + 1] = this.grid[this.grid.length - j];
         }
         // Need to make a new array here because we're overwriting arrays in the code above
@@ -222,16 +243,37 @@ class Board {
           row.push(undefined);
         }
         this.grid[0] = row;
-        this.score += 10;
-        this.lines += 1;        
+        this.lines += 1;
+        linesCleared += 1;
       }
     }
+    this.updateScore(linesCleared);
   }
-  
+
+  updateScore(linesCleared) {
+    let clearPoints = 50 * 2 << linesCleared - 1;
+    // Bonus for getting multiple 4+ line clears in a row
+    if(this.lastClear >= 4 && linesCleared >= 4) {
+      clearPoints += 400;
+    }
+    if (linesCleared > 0) {
+      this.lastClear = linesCleared;
+      this.updateLevel();
+    }
+    this.score += clearPoints * this.level.number;
+  }
+
+  updateLevel() {
+    if (Levels.length > 0 && this.lines >= this.level.nextLevel) {
+      this.level = new Level(this, Levels.shift());
+      this.game.level.text = this.level.number;
+    }
+  }
+
   draw() {
     this.currentPos = this.game.drawPiece(this.currentBlock, this.currentPos);
   }
-  
+
   drawOnce() {
     this.previewBlocks = this.game.drawPreviewPiece(this.previewPiece, this.previewBlocks)
   }
@@ -243,7 +285,9 @@ Board.numRows = 27;
 
 class BlockGame {
   constructor() {
-    this.root = new PIXI.Application(610, 900, {backgroundColor : 0xadd8e6});
+    this.root = new PIXI.Application(610, 863, {backgroundColor : 0xadd8e6});
+    this.background = new PIXI.extras.TilingSprite(Block_Textures[0], this.root.screen.width, this.root.screen.height);
+    this.root.stage.addChild(this.background);
     document.getElementById("game").appendChild(this.root.view);
     this.setBoard();
     this.initHud();
@@ -252,50 +296,76 @@ class BlockGame {
     document.body.addEventListener("keydown", e => this.handleKeyDowns(e));
     this.runGame();
   }
-  
+
   setBoard() {
     this.canvas = new BlockGameCanvas(this.root.stage);
     this.preview_canvas = new BlockGameCanvas(this.root.stage);
     this.board = new Board(this);
-    this.canvas.place(Board.blockSize * Board.numRows + 3, 
-                      Board.blockSize * Board.numColumns + 6, 24, 80);      
-                      
-    this.preview_canvas.place(Board.blockSize * 4 + 3, 
-    Board.blockSize * 4 + 3, 335, 200);
+    this.canvas.place(Board.blockSize * Board.numRows + 3,
+                      Board.blockSize * Board.numColumns + 6, 24, 80);
+
+    this.preview_canvas.place(Board.blockSize * 4 + 3,
+                              Board.blockSize * 4 + 3, 335, 200);
     this.board.drawOnce();
   }
-  
+
   initHud() {
-    let label = new PIXI.Text('Current Score: ', {fontSize: 12});
+    let fontStyle =  {fontSize: 16,
+                      fontFamily: 'segue',
+                      fontStyle: 'italic',
+                      fontWeight: 'bold',
+                      fill: '#ffff00',
+                      stroke: '#000000',
+                      strokeThickness: 3};
+
+    let label = new PIXI.Text('Current Score: ', fontStyle);
     label.x = 335;
-    label.y = 145;
+    label.y = 80;
     this.root.stage.addChild(label);
-    this.score = new PIXI.Text(this.board.score, {fontSize: 12});
-    this.score.x = 426;
-    this.score.y = 145;
+    this.score = new PIXI.Text(this.board.score, fontStyle);
+    this.score.x = 446;
+    this.score.y = 80;
     this.root.stage.addChild(this.score);
-    
-    label = new PIXI.Text('Next Piece', {fontSize: 16});
+
+    label = new PIXI.Text('Level: ', fontStyle);
+    label.x = 335;
+    label.y = 120;
+    this.root.stage.addChild(label);
+    this.level = new PIXI.Text(this.board.level.number, fontStyle);
+    this.level.x = 446;
+    this.level.y = 120;
+    this.root.stage.addChild(this.level);
+
+    label = new PIXI.Text('Lines: ', fontStyle);
+    label.x = 335;
+    label.y = 100;
+    this.root.stage.addChild(label);
+    this.lines = new PIXI.Text(this.board.lines, fontStyle);
+    this.lines.x = 446;
+    this.lines.y = 100;
+    this.root.stage.addChild(this.lines);
+
+    label = new PIXI.Text('Next Piece', fontStyle);
     label.x = 355;
     label.y = 180;
     this.root.stage.addChild(label);
-        
+
     this.button_new_game = new BlockGameButton(this.root.stage, 24, 20, "images/new_game_button.png", () => this.newGame());
     this.button_pause = new BlockGameButton(this.root.stage, 187, 20, "images/pause_button.png", () => this.pause());
-    
+
     this.button_left = new BlockGameButton(this.root.stage, 335, 735, "images/left_button.png", () => this.board.moveLeft());
     this.button_right = new BlockGameButton(this.root.stage, 475, 735, "images/right_button.png", () => this.board.moveRight());
     this.button_drop = new BlockGameButton(this.root.stage, 405, 795, "images/drop_button.png", () => this.board.dropAllTheWay());
     this.button_clockwise = new BlockGameButton(this.root.stage, 405, 675, "images/clockwise_button.png", () => this.board.rotateClockwise());
   }
-  
+
   runGame() {
     if (!this.board.gameOver() && this.running) {
       clearTimeout(this.timer);
       this.timer = setTimeout(() => {this.board.run(); this.runGame();}, this.board.delay);
     }
   }
-  
+
   handleKeyDowns(e) {
     switch(e.key) {
       case "ArrowUp":
@@ -321,14 +391,14 @@ class BlockGame {
         break;
     }
   }
-  
+
   newGame() {
     this.canvas.delete();
     this.setBoard();
     this.running = true;
     this.runGame();
   }
-  
+
   pause() {
     if (this.running) {
       this.running = false;
@@ -338,11 +408,12 @@ class BlockGame {
       this.runGame();
     }
   }
-  
+
   updateScore() {
     this.score.text = this.board.score;
+    this.lines.text = this.board.lines;
   }
-  
+
   drawPiece(piece, old=undefined) {
     if (old && piece.moved) {
       old.forEach(block=>block.remove());
@@ -350,12 +421,12 @@ class BlockGame {
     let size = Board.blockSize;
     let blocks = piece.currentRotation();
     let start = piece.position;
-    return blocks.map(block => 
-      new BlockGameRect(this.canvas, start[0]*size + block[0]*size + 3, 
+    return blocks.map(block =>
+      new BlockGameRect(this.canvas, start[0]*size + block[0]*size + 3,
                        start[1]*size + block[1]*size, size, size,
-                       piece.color));
+                       piece.texture, piece.tint));
   }
-  
+
   drawPreviewPiece(piece, old=undefined) {
     let size = Board.blockSize;
     let center_piece = (piece) => {
@@ -364,21 +435,21 @@ class BlockGame {
       return [this.preview_canvas.width / 2 - width / 2,
               this.preview_canvas.height / 2 - height / 2];
     }
-    
+
     function normalize(currentRotation) {
       let minWidth = currentRotation.reduce((acc, b) => b < acc ? b : acc)[0];
-      let minHeight = currentRotation.reduce((acc, b) => b[1] < acc ? b[1] : acc, currentRotation[0][1]);      
+      let minHeight = currentRotation.reduce((acc, b) => b[1] < acc ? b[1] : acc, currentRotation[0][1]);
       return currentRotation.map(block=> [block[0] - minWidth, block[1] - minHeight]);
     }
-    
+
     if (old) {
       old.forEach(block=>block.remove());
     }
-    
-    let blocks = normalize(piece.currentRotation());   
-    let start = center_piece(piece);    
-    return blocks.map(block => 
-      new BlockGameRect(this.preview_canvas, start[0] +block[0]*size, start[1] + block[1]*size, size, size, piece.color));
+
+    let blocks = normalize(piece.currentRotation());
+    let start = center_piece(piece);
+    return blocks.map(block =>
+      new BlockGameRect(this.preview_canvas, start[0] +block[0]*size, start[1] + block[1]*size, size, size, piece.texture, piece.tint));
   }
 }
 
