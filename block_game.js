@@ -14,16 +14,24 @@ class Piece {
     this.moved = true;
   }
 
-  currentRotation() {
+  get currentRotation() {
     return this.all_rotations[this.rotation_index];
   }
 
-  height() {
-    return this.currentRotation().map(b=>b[1]).filter((v, i, self) => self.indexOf(v) === i).length;
+  get height() {
+    return this.currentRotation.map(b=>b[1]).filter((v, i, self) => self.indexOf(v) === i).length;
   }
 
-  width() {
-    return this.currentRotation().map(b=>b[0]).filter((v, i, self) => self.indexOf(v) === i).length;
+  get width() {
+    return this.currentRotation.map(b=>b[0]).filter((v, i, self) => self.indexOf(v) === i).length;
+  }
+
+  get x() {
+    return this.position[0];
+  }
+
+  get y() {
+    return this.position[1];
   }
 
   dropByOne() {
@@ -58,25 +66,7 @@ class Piece {
     }
     return moved;
   }
-
-  static rotations(point_array) {
-    let rotate1 = point_array.map(p => [-p[1], p[0]]);
-    let rotate2 = point_array.map(p => [-p[0], -p[1]]);
-    let rotate3 = point_array.map(p => [p[1], -p[0]]);
-    return [point_array, rotate1, rotate2, rotate3];
-  }
 }
-
-Piece.All_Pieces = [[[[0, 0], [1, 0], [0, 1], [1, 1]]],  // square (only needs one)
-               Piece.rotations([[0, 0], [-1, 0], [1, 0], [0, -1]]), // T
-               [[[0, 0], [-1, 0], [1, 0], [2, 0]], // long (only needs two)
-               [[0, 0], [0, -1], [0, 1], [0, 2]]],
-               Piece.rotations([[0, 0], [0, -1], [0, 1], [1, 1]]), // L
-               Piece.rotations([[0, 0], [0, -1], [0, 1], [-1, 1]]), // inverted L
-               Piece.rotations([[0, 0], [-1, 0], [0, -1], [1, -1]]), // S
-               Piece.rotations([[0, 0], [1, 0], [0, -1], [-1, -1]])]; // Z
-
-Piece.All_Colors = [0x00FFFF, 0xD3D3D3, 0xFF0000, 0xFFFF00, 0xFF1493, 0x0000FF, 0x00FF00];
 
 class Level {
   constructor(board, data) {
@@ -199,7 +189,7 @@ class Board {
   }
 
   storeCurrent() {
-    let locations = this.currentBlock.currentRotation();
+    let locations = this.currentBlock.currentRotation;
     let displacement = this.currentBlock.position;
     for (let i in locations) {
       let current = locations[i];
@@ -418,22 +408,21 @@ class BlockGame {
 
   drawPiece(piece, old=undefined) {
     if (old && piece.moved) {
-      old.forEach(block=>block.remove());
+      old.forEach(block => block.remove());
     }
     let size = Board.blockSize;
-    let blocks = piece.currentRotation();
-    let start = piece.position;
+    let blocks = piece.currentRotation;
     return blocks.map(block =>
-      new BlockGameRect(this.canvas, start[0]*size + block[0]*size + 3,
-                       start[1]*size + block[1]*size, size, size,
+      new BlockGameRect(this.canvas, piece.x*size + block[0]*size + 3,
+                       piece.y*size + block[1]*size, size, size,
                        piece.texture, piece.tint));
   }
 
   drawPreviewPiece(piece, old=undefined) {
     let size = Board.blockSize;
     let center_piece = (piece) => {
-      let height = piece.height() * size;
-      let width = piece.width() * size;
+      let height = piece.height * size;
+      let width = piece.width * size;
       return [this.preview_canvas.width / 2 - width / 2,
               this.preview_canvas.height / 2 - height / 2];
     }
@@ -441,17 +430,17 @@ class BlockGame {
     function normalize(currentRotation) {
       let minWidth = currentRotation.reduce((acc, b) => b < acc ? b : acc)[0];
       let minHeight = currentRotation.reduce((acc, b) => b[1] < acc ? b[1] : acc, currentRotation[0][1]);
-      return currentRotation.map(block=> [block[0] - minWidth, block[1] - minHeight]);
+      return currentRotation.map(block => [block[0] - minWidth, block[1] - minHeight]);
     }
 
     if (old) {
-      old.forEach(block=>block.remove());
+      old.forEach(block => block.remove());
     }
 
-    let blocks = normalize(piece.currentRotation());
-    let start = center_piece(piece);
+    let blocks = normalize(piece.currentRotation);
+    let [x, y] = center_piece(piece);
     return blocks.map(block =>
-      new BlockGameRect(this.preview_canvas, start[0] +block[0]*size, start[1] + block[1]*size, size, size, piece.texture, piece.tint));
+      new BlockGameRect(this.preview_canvas, x + block[0]*size, y + block[1]*size, size, size, piece.texture, piece.tint));
   }
 }
 
